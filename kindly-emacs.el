@@ -31,41 +31,27 @@
   :package-version '(kindly-clj . "0.0.1"))
 
 (defun kindly-clj-overlay-eval-bounds (overlay)
-  (let* ((metadata (overlay-get overlay 'kindly-clj-metadata))
-         (start (marker-position (plist-get metadata 'start-form)))
-         (end (marker-position (plist-get metadata 'end-form))))
+  (let* ((start (overlay-start overlay))
+         (end (overlay-end overlay)))
     (when (and start end)
       (list start end))))
-
-(defun kindly-clj-overlay-gen-bounds (overlay)
-  (let* ((metadata (overlay-get overlay 'kindly-clj-metadata))
-         (start (marker-position (plist-get metadata 'start-gen)))
-         (end (marker-position (plist-get metadata 'end-gen))))
-    (when (and start end)
-      (list start end))))
-
-(defun kindly-clj--delete-overlay-content (overlay)
-  (save-excursion
-    (-let (((start end) (kindly-clj-overlay-gen-bounds overlay)))
-      (when (and start end)
-        (delete-region start end)
-        (plist-put metadata 'end-gen nil)
-        (plist-put metadata 'start-gen nil)))))
-
-(defun kindly-clj--delete-overlay-and-content (overlay)
-  (kindly-clj--delete-overlay-content overlay)
-  (delete-overlay overlay))
 
 (defun kindly-clj-delete-all-at-point (&optional point)
   (interactive)
-  (mapcar #'kindly-clj--delete-overlay-and-content (kindly-clj-overlays point)))
+  (mapcar #'delete-overlay (kindly-clj-overlays point)))
+
+(defun kindly-clj--overlay-update-result (overlay result)
+  (overlay-put overlay 'after-string (propertize
+                                      result
+                                      'face 'kindly-clj-highlight-face)))
 
 (defun kindly-clj-regenerate-at-point (&optional point)
   (interactive)
   (let ((overlay (kindly-clj-overlay (or point (point)))))
     (when-let (bounds (kindly-clj-overlay-eval-bounds overlay))
-      (kindly-clj--delete-overlay-and-content overlay)
-      (kindly-clj-visualise-bounds bounds))))
+      (kindly-clj--overlay-update-result overlay "Generating...")
+      (kindly-clj--overlay-update-result overlay
+                                         (kindly-clj--eval-result-string bounds)))))
 
 (defun kindly-clj--image-string (image)
   (propertize " "
@@ -82,59 +68,61 @@
   (define-keymap
     "C-c C-c" #'kindly-clj-regenerate-at-point))
 
-(defun kindly-clj--make-overlay (start end metadata)
-  (let ((overlay (make-overlay start end)))
-    (overlay-put overlay 'kindly-clj t)
-    ;; remove when text deleted...
-    (overlay-put overlay 'evaporate t)
-    (overlay-put overlay 'kindly-clj-metadata metadata)
-    (overlay-put overlay 'face 'kindly-clj-highlight-face)
-    (overlay-put overlay 'keymap kindly-clj-overlay-keymap)))
-
-(defun kindly-clj--point-marker (point)
-  (set-marker (make-marker) point))
-
-(defun kindly-clj-visualise-bounds (bounds)
+(defun kindly-clj--eval-result-string (bounds)
   (let* ((form  (apply #'buffer-substring-no-properties bounds))
          (bg-color (face-attribute 'kindly-clj-highlight-face :background))
          (resp (cider-nrepl-sync-request:eval
                 (format "(%s (do %s) \"%s\")" kindly-clj-fn form bg-color)
                 nil
                 (cider-current-ns)))
-         (start (car-safe bounds))
-         (end   (car-safe (cdr-safe bounds)))
          (val (nrepl-dict-get resp "value"))
          (_ (when (not val)
               (user-error (prin1-to-string resp))))
          (parsed-val (parseedn-read-str val))
          (type (gethash :kindly-emacs.kindly-emacs/type parsed-val))
          (content (gethash :content parsed-val)))
-    (save-excursion
-      ;; TODO: Could use the after-string property of the overlay here to make this save-able...!
-      ;; Also, I could then store the generated content in the overlay and re-insert after a save.
-      (goto-char end)
-      (insert
-       (cond
-        ((eq type :svg-src) (kindly-clj--insert-svg-src content))))
-      (kindly-clj--make-overlay start (point)
-                                `(type ,type
-                                       start-form ,(kindly-clj--point-marker start)
-                                       end-form ,(kindly-clj--point-marker end)
-                                       start-gen ,(kindly-clj--point-marker end)
-                                       end-gen ,(kindly-clj--point-marker (point)))))))
+    (cond
+     ((eq type :svg-src) (kindly-clj--insert-svg-src content)))))
 
-;; TODO - when I delete the form and write a new one, the new one ends up inside the markers!!
-;; Mayb when I delete the form, I just auto-delete the lot...?
+(defun kindly-clj--beginning-of-line-if-empty (pos)
+  "Return start of line containing POS if POS is the first non-blank character, and POS otherwise."
+  (save-excursion
+    (goto-char pos)
+    (beginning-of-line)
+    (if (string-match-p "^[[:blank:]]*$"
+                        (buffer-substring-no-properties (point) pos))
+        (point)
+      pos)))
+
+(defun kindly-clj--next-line-if-last-char (pos)
+  "Return start of line containing POS if POS is the first non-blank character, and POS otherwise."
+  (if (and (not (= pos (point-max)))
+           (not (string= (buffer-substring-no-properties pos (+ pos 1))
+                         "\n"))
+           (string= (buffer-substring-no-properties (+ pos 1) (+ pos 2))
+                    "\n"))
+      (1+ pos)
+    pos))
+
+(defun kindly-clj--expand-bounds (bounds)
+  (-let (((start end) bounds))
+    (list (kindly-clj--beginning-of-line-if-empty start)
+          (kindly-clj--next-line-if-last-char end))))
+
+(defun kindly-clj--eval-overlay-at-bounds (bounds)
+
+  (kindly-clj--make-overlay bounds
+                            (kindly-clj--eval-result-string bounds)))
 
 (defun kindly-clj-visualise-last-sexp ()
   (interactive)
-  (kindly-clj-visualise-bounds (cider-last-sexp 'bounds)))
+  (kindly-clj--eval-overlay-at-bounds (kindly-clj--expand-bounds (cider-last-sexp 'bounds))))
 
 (defun kindly-clj-visualise-region ()
   (interactive)
-  (-let ((((start . end)) (region-bounds)))
-    (kindly-clj-visualise-bounds (list start end))))
+  (-let ((((start . end)) (region-bounds))) ;; region-bounds is cons cell, cider bounds is a list
+    (kindly-clj--eval-overlay-at-bounds (kindly-clj--expand-bounds (list start end)))))
 
-(defun kindly-clj-defun-at-point ()
+(defun kindly-clj-visualise-defun-at-point ()
   (interactive)
-  (kindly-clj-visualise-form (cider-defun-at-point 'bounds)))
+  (kindly-clj--eval-overlay-at-bounds (kindly-clj--expand-bounds (cider-defun-at-point 'bounds))))
