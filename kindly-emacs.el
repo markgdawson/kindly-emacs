@@ -67,8 +67,16 @@
       (kindly-clj--delete-overlay-and-content overlay)
       (kindly-clj-visualise-bounds bounds))))
 
-(defun kindly-clj--insert-svg-src (content)
-  (insert-image (svg-image content) " " nil nil t))
+(defun kindly-clj--image-string (image)
+  (propertize " "
+              'display image
+              'rear-nonsticky t
+              'inhibit-isearch t
+              'keymap image-map))
+
+(defun kindly-clj--insert-svg-src (svg-string)
+  (format "\n\n%s\n\n"
+          (kindly-clj--image-string (svg-image svg-string))))
 
 (defvar kindly-clj-overlay-keymap
   (define-keymap
@@ -105,12 +113,9 @@
       ;; TODO: Could use the after-string property of the overlay here to make this save-able...!
       ;; Also, I could then store the generated content in the overlay and re-insert after a save.
       (goto-char end)
-      (newline)
-      (newline)
-      (cond
-       ((eq type :svg-src) (kindly-clj--insert-svg-src content)))
-      (newline)
-      (newline)
+      (insert
+       (cond
+        ((eq type :svg-src) (kindly-clj--insert-svg-src content))))
       (kindly-clj--make-overlay start (point)
                                 `(type ,type
                                        start-form ,(kindly-clj--point-marker start)
