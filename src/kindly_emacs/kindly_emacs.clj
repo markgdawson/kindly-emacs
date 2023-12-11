@@ -2,8 +2,6 @@
   (:require [applied-science.darkstar :as darkstar]
             [clojure.data.json :as json]))
 
-(json/write-str a)
-
 (defn- val->meta [val]
   (->> val
        meta
@@ -11,44 +9,70 @@
        keys
        first))
 
-(defn ->image [image-src]
-  {:image image-src})
+(defn- output-envelope [type content]
+  {::type type
+   :content content})
 
-(comment
-  (def val (with-meta
-             (assoc-in {:mark "bar",
-                        :encoding
-                        {:x {:field "a", :type "nominal", :axis {:labelAngle 0}},
-                         :y {:field "b", :type "quantitative"}}}
-                       [:data :values]
-                       [{:a "A", :b 28}
-                        {:a "B", :b 55}])
-             {:kind/vega-lite true}))
-  (val->meta val)
-  (->> val
-       json/write-str
-       darkstar/vega-lite-spec->svg
-       (spit "/tmp/vg-example.svg")
-       )
+(defn- ->svg-image [svg-source]
+  (output-envelope :svg-src svg-source))
 
-  )
-
-;; `file://tmp/vg-example.svg'
-
-
-
-(val->meta (with-meta {:one 1} {:kind/vega-lite 1}))
-
-(defmulti kindly-plot val->meta)
+(def kindly-plot nil)
+(defmulti kindly-plot (fn [v & _args] (val->meta v)))
 
 (defmethod kindly-plot :kind/vega-lite
-  [val]
-  (println val)
-  (println "plot vega lite...!")
-  (->image "image-path..."))
+  [val background-color]
+  (->> (assoc val :background background-color)
+       json/write-str
+       darkstar/vega-lite-spec->svg
+       ->svg-image))
 
 (defmethod kindly-plot :kind/table
-  [val]
+  [val background-color]
   (println "plot table...!"))
 
-(kindly-plot a)
+
+(comment
+  (json/write-str a)
+
+  (with-meta
+    (assoc-in {:mark "bar",
+               :encoding
+               {:x {:field "a", :type "nominal", :axis {:labelAngle 0}},
+                :y {:field "b", :type "quantitative"}}
+               :width 500
+               :height 44}
+              [:data :values]
+              [{:a "A", :b 28}
+               {:a "B", :b 15}])
+    {:kind/vega-lite true})
+
+
+
+
+
+  (def data-for-plot [{:a "A", :b 28}
+                      {:a "B", :b 55}])
+
+  ^:kind/vega-lite
+  {:data {:values data-for-plot}
+   :mark "bar",
+   :encoding
+   {:x {:field "a", :type "nominal", :axis {:labelAngle 0}},
+    :y {:field "b", :type "quantitative"}}
+   :width 500}
+
+
+
+
+
+  (val->meta (with-meta {:one 1} {:kind/vega-lite 1}))
+
+  (val->meta val)
+
+  (kindly-plot val)
+
+  ;; (setq aaa (svg-image (file-to-string "/tmp/vg-example.svg")))
+  ;; (setq-local iimage-mode-image-regex-alist '((";; kindly-image-file:\\[\\(.*\\)\\]" . 1)))
+
+  ;; kindly-image-file:[/tmp/vg-example.svg]
+  )
