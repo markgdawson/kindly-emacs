@@ -1,4 +1,6 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         scicloj/tablecloth {:mvn/version "LATEST"}
-        org.scicloj/kindly-advice {:mvn/version "LATEST"}}}
+        org.graalvm.js/js {:mvn/version "20.0.0"} ;; required for bundling darkstar
+        org.graalvm.js/js-scriptengine {:mvn/version "20.0.0"} ;; required for bundling darkstar
+        org.scicloj/kindly-advice {:mvn/version "1-alpha5"}}}
