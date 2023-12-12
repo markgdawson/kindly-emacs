@@ -1,5 +1,5 @@
 (ns kindly-emacs.kindly-emacs
-  (:require [applied-science.darkstar :as darkstar]
+  (:require [kindly-emacs.darkstar :as darkstar]
             [scicloj.kindly-advice.v1.api :refer [advise]]
             [tablecloth.api :as tc]
             [clojure.data.json :as json]))
