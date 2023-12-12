@@ -1,5 +1,6 @@
 (ns kindly-emacs.kindly-emacs
   (:require [applied-science.darkstar :as darkstar]
+            [tablecloth.api :as tc]
             [clojure.data.json :as json]))
 
 (defn- val->meta [val]
@@ -16,6 +17,9 @@
 (defn- ->svg-image [svg-source]
   (output-envelope :svg-src svg-source))
 
+(defn- ->text [content]
+  (output-envelope :text content))
+
 (defmulti kindly-plot (fn [v & _args] (val->meta v)))
 
 (defmethod kindly-plot :kind/vega-lite
@@ -25,6 +29,14 @@
        darkstar/vega-lite-spec->svg
        ->svg-image))
 
+(defmethod kindly-plot :kind/dataset
+  [val _bg-color]
+  (binding [*out* (java.io.StringWriter.)]
+    (-> val
+        (tc/head 10)
+        (tc/rows :as-maps)
+        clojure.pprint/print-table)
+    (->text (.toString *out*))))
 
 (comment
   ;; Some plotting examples

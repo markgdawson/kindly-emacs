@@ -82,7 +82,8 @@
          (type (gethash :kindly-emacs.kindly-emacs/type parsed-val))
          (content (gethash :content parsed-val)))
     (cond
-     ((eq type :svg-src) (kindly-clj--insert-svg-src content)))))
+     ((eq type :svg-src) (kindly-clj--insert-svg-src content))
+     ((eq type :text) (format "\n%s\n" content)))))
 
 (defun kindly-clj--beginning-of-line-if-empty (pos)
   "Return start of line containing POS if POS is the first non-blank character, and POS otherwise."
