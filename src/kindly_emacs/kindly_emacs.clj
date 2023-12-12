@@ -1,8 +1,10 @@
 (ns kindly-emacs.kindly-emacs
-  (:require [kindly-emacs.darkstar :as darkstar]
-            [scicloj.kindly-advice.v1.api :refer [advise]]
-            [tablecloth.api :as tc]
-            [clojure.data.json :as json]))
+  (:require
+   [clojure.data.json :as json]
+   [clojure.pprint :as pprint]
+   [kindly-emacs.darkstar :as darkstar]
+   [scicloj.kindly-advice.v1.api :refer [advise]]
+   [tablecloth.api :as tc]))
 
 (defn- val->meta [val]
   (:kind (advise {:value val})))
@@ -26,14 +28,32 @@
        darkstar/vega-lite-spec->svg
        ->svg-image))
 
+(defn dataset-rows->string [dataset header?]
+  (binding [*out* (java.io.StringWriter.)]
+    (pprint/print-table (tc/rows dataset :as-maps))
+    (let [s (.toString *out*)]
+      (if header?
+        s
+        (-> s
+            clojure.string/split-lines
+            (nthnext 3)
+            (->> (clojure.string/join "\n")
+                 (str "\n")))))))
+
 (defmethod kindly-plot :kind/dataset
   [val _bg-color]
-  (binding [*out* (java.io.StringWriter.)]
-    (-> val
-        (tc/head 10)
-        (tc/rows :as-maps)
-        clojure.pprint/print-table)
-    (->text (.toString *out*))))
+  (let [row-count (tc/row-count val)]
+    (->text (format "\nRows: %d\n%s"
+                    row-count
+                    (if (<= row-count 25)
+                      (dataset-rows->string val true)
+                      (str (-> val
+                               (tc/head 7)
+                               (dataset-rows->string true))
+                           "..."
+                           (-> val
+                               (tc/head 7)
+                               (dataset-rows->string false))))))))
 
 (comment
 
