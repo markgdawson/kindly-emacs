@@ -1,14 +1,11 @@
 (ns kindly-emacs.kindly-emacs
   (:require [applied-science.darkstar :as darkstar]
+            [scicloj.kindly-advice.v1.api :refer [advise]]
             [tablecloth.api :as tc]
             [clojure.data.json :as json]))
 
 (defn- val->meta [val]
-  (->> val
-       meta
-       (filter (fn [[k v]] (and v (= "kind" (namespace k)))))
-       keys
-       first))
+  (:kind (advise {:value val})))
 
 (defn- output-envelope [type content]
   {::type type
@@ -39,6 +36,7 @@
     (->text (.toString *out*))))
 
 (comment
+
   ;; Some plotting examples
   (with-meta
     (assoc-in {:mark "bar",
@@ -47,7 +45,7 @@
                 :y {:field "b", :type "quantitative"}}
                :width 500
                :height 44
-               :title "BBob"}
+               :title "Title"}
               [:data :values]
               [{:a "A", :b 28}
                {:a "D", :b 15}])
