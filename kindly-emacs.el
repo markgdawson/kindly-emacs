@@ -17,6 +17,16 @@
         (user-error "Multiple (overlapping?) kindly overlays at point!")
       (car o))))
 
+(defun kindly-clj--make-overlay (bounds result-string)
+  (let ((overlay (apply #'make-overlay bounds)))
+    (overlay-put overlay 'kindly-clj t)
+    ;; remove when text deleted...
+    (kindly-clj--overlay-update-result overlay result-string)
+    (overlay-put overlay 'evaporate t)
+    (overlay-put overlay 'modification-hooks (list #'kindly-clj--overlay-modification-hooks))
+    (overlay-put overlay 'face 'kindly-clj-highlight-face)
+    (overlay-put overlay 'keymap kindly-clj-overlay-keymap)))
+
 (defun kindly-clj-delete-all-overlays-at-pos (&optional pos)
   (mapcar #'delete-overlay (kindly-clj-overlays pos)))
 
