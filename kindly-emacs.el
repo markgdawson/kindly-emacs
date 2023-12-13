@@ -40,6 +40,18 @@
   "Face for previewed forms"
   :package-version '(kindly-clj . "0.0.1"))
 
+(defface kindly-clj-stale-visualisation-face
+  '((((class color) (background light))
+     :height 1
+     :background "orange"
+     :extend t)
+    (((class color) (background dark))
+     :height 1
+     :background "orange"
+     :extend t))
+  "Face for stale visualisation marker forms"
+  :package-version '(kindly-clj . "0.0.1"))
+
 (defun kindly-clj-overlay-eval-bounds (overlay)
   (let* ((start (overlay-start overlay))
          (end (overlay-end overlay)))
@@ -49,6 +61,17 @@
 (defun kindly-clj-delete-all-at-point (&optional point)
   (interactive)
   (mapcar #'delete-overlay (kindly-clj-overlays point)))
+
+(defun kindly-clj--overlay-set-stale (overlay stale?)
+  (if stale?
+    (overlay-put overlay 'before-string (propertize
+                                         "\n"
+                                         'face 'kindly-clj-stale-visualisation-face))
+    (overlay-put overlay 'before-string nil)))
+
+(defun kindly-clj--overlay-modification-hooks (overlay after? &rest _args)
+  (when after?
+    (kindly-clj--overlay-set-stale overlay t)))
 
 (defun kindly-clj--overlay-update-result (overlay result)
   (overlay-put overlay 'after-string (propertize
@@ -60,9 +83,10 @@
   (interactive)
   (let ((overlay (kindly-clj-overlay (or point (point)))))
     (when-let (bounds (kindly-clj-overlay-eval-bounds overlay))
-      (kindly-clj--overlay-update-result overlay "Generating...")
+      (kindly-clj--overlay-update-result overlay "...")
       (kindly-clj--overlay-update-result overlay
-                                         (kindly-clj--eval-result-string bounds)))))
+                                         (kindly-clj--eval-result-string bounds))
+      (kindly-clj--overlay-set-stale overlay nil))))
 
 (defun kindly-clj--image-string (image)
   (propertize " "
