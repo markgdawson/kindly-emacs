@@ -46,6 +46,7 @@
                                       'face 'kindly-clj-highlight-face)))
 
 (defun kindly-clj-regenerate-at-point (&optional point)
+  "Regenerate the visualisation form at point"
   (interactive)
   (let ((overlay (kindly-clj-overlay (or point (point)))))
     (when-let (bounds (kindly-clj-overlay-eval-bounds overlay))
@@ -69,6 +70,21 @@
     "C-c C-c" #'kindly-clj-regenerate-at-point))
 
 (defun kindly-clj--eval-result-string (bounds)
+  "Returns visualisation string for the Clojure form within the specified BOUNDS of current buffer.
+
+This function uses CIDER to evaluate the Clojure form(s). The result is processed and displayed based on its type.
+
+Parameters:
+  - BOUNDS: A list representing the start and end positions of the buffer region
+    to evaluate.
+
+Returns:
+  - For SVG source: Returns a formatted string with SVG source applied as a display property.
+  - For plain text: Returns a formatted string containing the evaluated text.
+  - Raises an error if the evaluation result is empty or not in the expected format.
+
+Example Usage:
+  (kindly-clj--eval-result-string (list start-pos end-pos))"
   (let* ((form  (apply #'buffer-substring-no-properties bounds))
          (bg-color (face-attribute 'kindly-clj-highlight-face :background))
          (resp (cider-nrepl-sync-request:eval
@@ -106,24 +122,27 @@
     pos))
 
 (defun kindly-clj--expand-bounds (bounds)
+  "Return a new BOUNDS which is expanded to contain any whitespace before line start and trailing newlines (unless already included)"
   (-let (((start end) bounds))
     (list (kindly-clj--beginning-of-line-if-empty start)
           (kindly-clj--next-line-if-last-char end))))
 
 (defun kindly-clj--eval-overlay-at-bounds (bounds)
-
   (kindly-clj--make-overlay bounds
                             (kindly-clj--eval-result-string bounds)))
 
 (defun kindly-clj-visualise-last-sexp ()
+  "Visualise the last sexp with kindly-clj"
   (interactive)
   (kindly-clj--eval-overlay-at-bounds (kindly-clj--expand-bounds (cider-last-sexp 'bounds))))
 
 (defun kindly-clj-visualise-region ()
+  "Visualise the current region with kindly-clj"
   (interactive)
   (-let ((((start . end)) (region-bounds))) ;; region-bounds is cons cell, cider bounds is a list
     (kindly-clj--eval-overlay-at-bounds (kindly-clj--expand-bounds (list start end)))))
 
 (defun kindly-clj-visualise-defun-at-point ()
+  "Visualise the top level defun at point with kindly-clj"
   (interactive)
   (kindly-clj--eval-overlay-at-bounds (kindly-clj--expand-bounds (cider-defun-at-point 'bounds))))
