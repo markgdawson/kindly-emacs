@@ -17,7 +17,28 @@
         (user-error "Multiple (overlapping?) kindly overlays at point!")
       (car o))))
 
+(defun kindly-clj--content-hash (overlay)
+  (secure-hash 'sha512 (overlay-buffer overlay) (overlay-start overlay) (overlay-end overlay)))
+
+(defun kindly-clj--overlay-modified? (overlay)
+  "Return true if content of OVERLAY modified since last generation time."
+  (not (string= (kindly-clj--content-hash overlay)
+                (overlay-get overlay 'kindly-clj--last-eval-hash))))
+
+(defun kindly-clj--mark-generated (overlay)
+  "Sets the hash of content of OVERLAY at generation time."
+  (overlay-put overlay 'kindly-clj--last-eval-hash (kindly-clj--content-hash overlay))
+  (overlay-put overlay 'before-string nil))
+
+(defun kindly-clj--update-stale-marker (overlay)
+  "Update visual indicator that OVERLAY is stale."
+  (overlay-put overlay 'before-string (when (kindly-clj--overlay-modified? overlay)
+                                        (propertize
+                                         "\n"
+                                         'face 'kindly-clj-stale-visualisation-face))))
+
 (defun kindly-clj--make-overlay (bounds result-string)
+  "Create an overlay around BOUNDS displaying RESULT-STRING"
   (let ((overlay (apply #'make-overlay bounds)))
     (overlay-put overlay 'kindly-clj t)
     ;; remove when text deleted...
@@ -25,10 +46,8 @@
     (overlay-put overlay 'evaporate t)
     (overlay-put overlay 'modification-hooks (list #'kindly-clj--overlay-modification-hooks))
     (overlay-put overlay 'face 'kindly-clj-highlight-face)
-    (overlay-put overlay 'keymap kindly-clj-overlay-keymap)))
-
-(defun kindly-clj-delete-all-overlays-at-pos (&optional pos)
-  (mapcar #'delete-overlay (kindly-clj-overlays pos)))
+    (overlay-put overlay 'keymap kindly-clj-overlay-keymap)
+    (kindly-clj--update-hash overlay)))
 
 (defface kindly-clj-highlight-face
   '((((class color) (background light))
@@ -62,21 +81,15 @@
   (interactive)
   (mapcar #'delete-overlay (kindly-clj-overlays point)))
 
-(defun kindly-clj--overlay-set-stale (overlay stale?)
-  (if stale?
-    (overlay-put overlay 'before-string (propertize
-                                         "\n"
-                                         'face 'kindly-clj-stale-visualisation-face))
-    (overlay-put overlay 'before-string nil)))
-
 (defun kindly-clj--overlay-modification-hooks (overlay after? &rest _args)
   (when after?
-    (kindly-clj--overlay-set-stale overlay t)))
+    (kindly-clj--update-stale-marker overlay)))
 
 (defun kindly-clj--overlay-update-result (overlay result)
   (overlay-put overlay 'after-string (propertize
                                       result
-                                      'face 'kindly-clj-highlight-face)))
+                                      'face 'kindly-clj-highlight-face))
+  (kindly-clj--mark-generated overlay))
 
 (defun kindly-clj-regenerate-at-point (&optional point)
   "Regenerate the visualisation form at point"
@@ -85,8 +98,7 @@
     (when-let (bounds (kindly-clj-overlay-eval-bounds overlay))
       (kindly-clj--overlay-update-result overlay "...")
       (kindly-clj--overlay-update-result overlay
-                                         (kindly-clj--eval-result-string bounds))
-      (kindly-clj--overlay-set-stale overlay nil))))
+                                         (kindly-clj--eval-result-string bounds)))))
 
 (defun kindly-clj--image-string (image)
   (propertize " "
