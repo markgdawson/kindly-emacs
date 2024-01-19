@@ -13,6 +13,7 @@ The processing is done by a companion Clojure library. The **kindly-emacs.kindly
 ## Requirements
 
 - [parseedn](https://github.com/clojure-emacs/parseedn): A Clojure library for parsing EDN (extensible data notation).
+- requires Emacs built with SVG support.
 
 ## Screenshots
 
