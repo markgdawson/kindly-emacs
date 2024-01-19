@@ -108,8 +108,17 @@
               'keymap image-map))
 
 (defun kindly-clj--insert-svg-src (svg-string)
-  (format "\n\n%s\n\n"
-          (kindly-clj--image-string (svg-image svg-string))))
+  (condition-case
+      (format "\n\n%s\n\n"
+              (kindly-clj--image-string (svg-image svg-string)))
+      (error
+       (if (length= svg-string 0)
+           "SVG image is empty"
+         (progn
+           (with-current-buffer (get-buffer-create "*kindly-emacs-error*")
+             (erase-buffer)
+             (insert svg-string))
+           "Error displaying SVG image see *kindly-emacs-error* for SVG")))))
 
 (defvar kindly-clj-overlay-keymap
   (define-keymap
